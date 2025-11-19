@@ -16,6 +16,9 @@ database.init_database()
 from routes import auth, dashboard, users, groups, siem
 from api import logs_api, users_api, groups_api, reports_api
 
+csrf.exempt(logs_api.ingest_logs)
+csrf.exempt(logs_api.receive_syslog)
+
 app.register_blueprint(auth.bp)
 app.register_blueprint(dashboard.bp)
 app.register_blueprint(users.bp)

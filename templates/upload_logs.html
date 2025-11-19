@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Logs - SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-upload"></i> Upload Log Files
+                <a href="{{ url_for('siem.siem_dashboard') }}" class="btn btn-sm btn-secondary float-end">
+                    <i class="fas fa-arrow-left"></i> Back to SIEM
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h5><i class="fas fa-file-csv"></i> Import CSV Log Files</h5>
+                    <p class="text-muted">Upload CSV files containing log entries. Supported formats include operation logs with columns like: Operation, Level, Operator, Time, Source, Terminal IP Address, etc.</p>
+                    
+                    <form method="POST" action="{{ url_for('siem.upload_logs') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="log_source_id" class="form-label">Log Source (Optional)</label>
+                            <select class="form-select" id="log_source_id" name="log_source_id">
+                                <option value="">No specific source</option>
+                                {% for source in log_sources %}
+                                <option value="{{ source.id }}">{{ source.name }} ({{ source.source_type }})</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Associate imported logs with a specific source</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="csv_file" class="form-label">Select CSV File</label>
+                            <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                            <div class="form-text">Choose a CSV file to import log entries</div>
+                        </div>
+                        <button type="submit" class="btn zain-btn-primary">
+                            <i class="fas fa-upload"></i> Upload and Import
+                        </button>
+                    </form>
+                </div>
+
+                <hr>
+
+                <div class="mt-4">
+                    <h5><i class="fas fa-info-circle"></i> CSV Format Example</h5>
+                    <p class="text-muted">Your CSV file should contain columns like:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Operation</th>
+                                    <th>Level</th>
+                                    <th>Operator</th>
+                                    <th>Time</th>
+                                    <th>Source</th>
+                                    <th>Terminal IP Address</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>query current activities</td>
+                                    <td>Minor</td>
+                                    <td>admin</td>
+                                    <td>2025-11-18 13:58:50</td>
+                                    <td>OSSFaceService</td>
+                                    <td>192.168.27.27</td>
+                                    <td>Successful</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted small">
+                        <strong>Level Mapping:</strong> Minor → INFO, Warning → WARNING, Major → ERROR, Critical → CRITICAL
+                    </p>
+                </div>
+
+                <hr>
+
+                <div class="mt-4">
+                    <h5><i class="fas fa-code"></i> API Integration</h5>
+                    <p class="text-muted">For automated log ingestion, use our API endpoints. <a href="{{ url_for('siem.manage_log_sources') }}" class="zain-link">Create an API key</a> to get started.</p>
+                    <div class="alert alert-info">
+                        <strong>Endpoints:</strong><br>
+                        <code>POST /api/ingest</code> - JSON log ingestion<br>
+                        <code>POST /api/syslog</code> - Syslog format ingestion<br>
+                        <small>Requires API key in header: <code>X-API-Key: your-api-key</code></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if log_sources %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-server"></i> Active Log Sources
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Source IP</th>
+                                <th>Total Logs</th>
+                                <th>Last Received</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for source in log_sources %}
+                            <tr>
+                                <td>{{ source.name }}</td>
+                                <td><span class="badge bg-secondary">{{ source.source_type }}</span></td>
+                                <td>{{ source.source_ip or 'N/A' }}</td>
+                                <td>{{ source.total_logs_received }}</td>
+                                <td>{{ source.last_received.strftime('%Y-%m-%d %H:%M:%S') if source.last_received else 'Never' }}</td>
+                                <td>
+                                    {% if source.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

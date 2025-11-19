@@ -49,6 +49,20 @@ def init_database():
     ''')
     
     cur.execute('''
+        CREATE TABLE IF NOT EXISTS log_sources (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            source_type VARCHAR(50) NOT NULL,
+            source_ip VARCHAR(50),
+            api_key VARCHAR(255),
+            is_active BOOLEAN DEFAULT TRUE,
+            total_logs_received INTEGER DEFAULT 0,
+            last_received TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS syslog_events (
             id SERIAL PRIMARY KEY,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -58,6 +72,7 @@ def init_database():
             event_type VARCHAR(100),
             message TEXT NOT NULL,
             user_id INTEGER REFERENCES users(id),
+            log_source_id INTEGER REFERENCES log_sources(id),
             raw_log TEXT,
             processed BOOLEAN DEFAULT FALSE
         )
@@ -238,19 +253,32 @@ def get_logs_by_severity(severity, limit=100):
     conn.close()
     return logs
 
-def insert_log_event(severity, message, source_ip=None, source_host=None, event_type=None, user_id=None, raw_log=None):
+def insert_log_event(severity, message, source_ip=None, source_host=None, event_type=None, user_id=None, raw_log=None, log_source_id=None):
     conn = get_db_connection()
     cur = conn.cursor()
     
-    cur.execute(
-        "INSERT INTO syslog_events (severity, message, source_ip, source_host, event_type, user_id, raw_log) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (severity, message, source_ip, source_host, event_type, user_id, raw_log)
-    )
-    log_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return log_id
+    try:
+        cur.execute(
+            "INSERT INTO syslog_events (severity, message, source_ip, source_host, event_type, user_id, raw_log, log_source_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (severity, message, source_ip, source_host, event_type, user_id, raw_log, log_source_id)
+        )
+        log_id = cur.fetchone()[0]
+        
+        if log_source_id:
+            cur.execute(
+                "UPDATE log_sources SET total_logs_received = total_logs_received + 1, last_received = CURRENT_TIMESTAMP WHERE id = %s",
+                (log_source_id,)
+            )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return log_id
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        raise e
 
 def receive_syslog_event(raw_data):
     insert_log_event(
@@ -319,3 +347,117 @@ def update_last_login(user_id):
     conn.commit()
     cur.close()
     conn.close()
+
+def create_log_source(name, source_type, source_ip=None, api_key=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute(
+        "INSERT INTO log_sources (name, source_type, source_ip, api_key) VALUES (%s, %s, %s, %s) RETURNING id",
+        (name, source_type, source_ip, api_key)
+    )
+    source_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return source_id
+
+def get_all_log_sources():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM log_sources ORDER BY created_at DESC")
+    sources = cur.fetchall()
+    cur.close()
+    conn.close()
+    return sources
+
+def update_log_source_stats(source_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE log_sources SET total_logs_received = total_logs_received + 1, last_received = CURRENT_TIMESTAMP WHERE id = %s",
+        (source_id,)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def verify_api_key(api_key):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM log_sources WHERE api_key = %s AND is_active = TRUE", (api_key,))
+    source = cur.fetchone()
+    cur.close()
+    conn.close()
+    return source
+
+def insert_log_event_with_source(severity, message, source_id=None, source_ip=None, source_host=None, event_type=None, user_id=None, raw_log=None):
+    return insert_log_event(
+        severity=severity,
+        message=message,
+        source_ip=source_ip,
+        source_host=source_host,
+        event_type=event_type,
+        user_id=user_id,
+        raw_log=raw_log,
+        log_source_id=source_id
+    )
+
+def insert_bulk_logs(logs_data, log_source_id=None):
+    inserted_count = 0
+    errors = []
+    
+    for idx, log_entry in enumerate(logs_data):
+        conn = None
+        cur = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            cur.execute(
+                "INSERT INTO syslog_events (severity, message, source_ip, source_host, event_type, raw_log, timestamp, log_source_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    log_entry.get('severity', 'INFO'),
+                    log_entry.get('message', ''),
+                    log_entry.get('source_ip'),
+                    log_entry.get('source_host'),
+                    log_entry.get('event_type'),
+                    log_entry.get('raw_log'),
+                    log_entry.get('timestamp'),
+                    log_source_id
+                )
+            )
+            conn.commit()
+            inserted_count += 1
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            errors.append(f"Row {idx}: {str(e)}")
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+    
+    if log_source_id and inserted_count > 0:
+        conn = None
+        cur = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE log_sources SET total_logs_received = total_logs_received + %s, last_received = CURRENT_TIMESTAMP WHERE id = %s",
+                (inserted_count, log_source_id)
+            )
+            conn.commit()
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            errors.append(f"Failed to update source stats: {str(e)}")
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+    
+    return inserted_count, errors

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Log Sources - SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-server"></i> Log Sources Management
+                <a href="{{ url_for('siem.siem_dashboard') }}" class="btn btn-sm btn-secondary float-end">
+                    <i class="fas fa-arrow-left"></i> Back to SIEM
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-plus-circle"></i> Create New Log Source</h5>
+                        <form method="POST" action="{{ url_for('siem.create_log_source') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Source Name</label>
+                                <input type="text" class="form-control" id="name" name="name" placeholder="e.g., Firewall Server 1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="source_type" class="form-label">Source Type</label>
+                                <select class="form-select" id="source_type" name="source_type" required>
+                                    <option value="SYSLOG">Syslog Server</option>
+                                    <option value="FORWARDING">Forwarding Server</option>
+                                    <option value="API">API Integration</option>
+                                    <option value="CSV">CSV Import</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="source_ip" class="form-label">Source IP Address (Optional)</label>
+                                <input type="text" class="form-control" id="source_ip" name="source_ip" placeholder="192.168.1.100">
+                            </div>
+                            <button type="submit" class="btn zain-btn-primary">
+                                <i class="fas fa-key"></i> Generate API Key & Create Source
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle"></i> API Integration Guide</h6>
+                            <p class="mb-2">After creating a log source, you'll receive an API key. Use it to send logs:</p>
+                            <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST https://your-domain/api/ingest \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "severity": "WARNING",
+    "message": "Suspicious activity detected",
+    "source_ip": "192.168.1.50",
+    "event_type": "SECURITY_ALERT"
+  }'</code></pre>
+                            <p class="small text-muted mb-0">You can also send multiple logs as an array.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h5><i class="fas fa-list"></i> Configured Log Sources</h5>
+                {% if sources %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Source IP</th>
+                                <th>Total Logs Received</th>
+                                <th>Last Received</th>
+                                <th>Created At</th>
+                                <th>Status</th>
+                                <th>API Key</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for source in sources %}
+                            <tr>
+                                <td>{{ source.id }}</td>
+                                <td><strong>{{ source.name }}</strong></td>
+                                <td><span class="badge bg-primary">{{ source.source_type }}</span></td>
+                                <td>{{ source.source_ip or 'N/A' }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ source.total_logs_received }}</span>
+                                </td>
+                                <td>
+                                    {% if source.last_received %}
+                                    {{ source.last_received.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                    <span class="text-muted">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ source.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if source.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <code class="api-key-display">{{ source.api_key[:8] }}...{{ source.api_key[-4:] }}</code>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="copyApiKey('{{ source.api_key }}')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> No log sources configured yet. Create your first log source above to start receiving logs from external systems.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyApiKey(apiKey) {
+    navigator.clipboard.writeText(apiKey).then(() => {
+        alert('API Key copied to clipboard!');
+    }).catch(err => {
+        prompt('Copy API Key:', apiKey);
+    });
+}
+</script>
+{% endblock %}
