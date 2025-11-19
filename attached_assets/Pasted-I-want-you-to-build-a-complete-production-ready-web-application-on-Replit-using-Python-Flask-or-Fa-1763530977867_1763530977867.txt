@@ -1,0 +1,115 @@
+I want you to build a complete, production-ready web application on Replit using Python (Flask or FastAPI).  
+The project must include a full SIEM-style dashboard, user management system, MySQL integration, APIs, and a modern UI designed in the visual style of Zain Telecom (purple gradients, yellow, black, white, smooth UI/UX).
+
+Please generate the entire project structure, all code files, all frontend pages, and make it fully runnable on Replit.  
+I will later export the project to my real Linux server.
+
+===========================
+ PROJECT REQUIREMENTS
+===========================
+
+1) **Technology Stack**
+   - Backend: Python Flask or FastAPI
+   - Frontend: HTML5, CSS3, JS, Bootstrap or Tailwind, Chart.js
+   - Database: MySQL (with config.py for connection settings)
+
+2) **Design Requirements**
+   - Theme must match Zain Telecom design:
+       • Purple gradients
+       • Yellow accent
+       • Black/white contrast
+       • Modern rounded UI components
+       • Clean dashboard layout
+   - Mobile-responsive layout
+   - Include a Zain-style custom logo file in /static/img/logo.png
+
+3) **Pages to Build**
+   - Login page (beautiful, professional, Zain-styled)
+   - Admin Dashboard
+   - Manager Dashboard
+   - Analyst/Employee Dashboard
+   - Users Management
+   - Groups & Permissions Management
+   - SIEM Dashboard with:
+       • Latest logs
+       • Log summary cards
+       • Alerts panel
+       • Daily user activity summary
+       • Multiple charts using Chart.js
+
+4) **User System**
+   - Roles: Admin, Manager, Analyst, User
+   - Each role sees different pages
+   - Secure login using sessions
+   - CRUD for users
+   - CRUD for groups
+   - Attach permissions to each group
+
+5) **MySQL Database Integration**
+   Create and integrate the following tables:
+   - `users`
+   - `groups`
+   - `syslog_events`
+   - `activity_reports`
+   - `permissions`
+
+   Include:
+   - database.py (connection + helpers)
+   - config.py (MySQL credentials)
+
+6) **SIEM Event Ingestion**
+   - For Replit: create an endpoint `/simulate-log` to insert test logs (no real syslog ingestion required on Replit)
+   - Prepare a clean function in backend called `receive_syslog_event()` so I can later replace it with real syslog or forwarding protocol on my real server.
+
+7) **API Endpoints**
+   - GET /api/logs
+   - GET /api/logs/latest
+   - GET /api/users
+   - POST /api/users/add
+   - POST /api/groups/add
+   - GET /api/groups
+   - GET /api/daily-report?group=<id>
+
+8) **Daily Reports Feature**
+   - Every 24 hours, the system generates a summary for each group manager:
+       • user activity
+       • unusual behavior
+       • missing daily work
+       • rule violations
+   - Generate a simple function to produce these summaries and store them in the `activity_reports` table.
+
+9) **Project Structure**
+   Include exactly this structure:
+
+   /app.py  
+   /routes/ (all route files)  
+   /templates/ (HTML, Jinja templates)  
+   /static/css/style.css  
+   /static/js/main.js  
+   /static/img/logo.png  
+   /database.py  
+   /config.py  
+   /models/  
+   /api/  
+
+10) **Coding Standards**
+   - Clean code with comments
+   - Modular structure
+   - Functions separated logically
+   - Minimal hardcoding
+   - Fully runnable on Replit with no missing files
+
+===========================
+ DELIVERABLES
+===========================
+
+Please generate:
+- All backend code
+- All frontend code (HTML/CSS/JS)
+- All assets
+- A complete runnable system
+- Instructions inside README.md for deploying on a real Linux server
+
+===========================
+BEGIN BUILDING THE PROJECT NOW
+===========================
