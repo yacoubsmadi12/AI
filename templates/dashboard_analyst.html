@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Analyst Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-welcome">
+    <h1><i class="fas fa-chart-bar"></i> Welcome, {{ username }}!</h1>
+    <p class="mb-0">Role: Analyst | Security monitoring and analysis</p>
+    <div class="quick-actions">
+        <a href="{{ url_for('siem.siem_dashboard') }}" class="btn zain-btn-secondary">
+            <i class="fas fa-shield-alt"></i> SIEM Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="stat-card stat-card-purple">
+            <div class="stat-icon"><i class="fas fa-list"></i></div>
+            <div class="stat-value" id="todayEvents">--</div>
+            <div class="stat-label">Today's Events</div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="stat-card stat-card-black">
+            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-value" id="alerts">--</div>
+            <div class="stat-label">Critical Alerts</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-stream"></i> Event Stream
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Severity</th>
+                                <th>Event Type</th>
+                                <th>Source</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eventStream">
+                            <tr>
+                                <td colspan="5" class="text-center">Loading events...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadAnalystData();
+    setInterval(loadAnalystData, 10000);
+});
+
+function loadAnalystData() {
+    fetch('/api/logs/latest?limit=50')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('todayEvents').textContent = data.length;
+            const critical = data.filter(log => log.severity === 'CRITICAL' || log.severity === 'ERROR').length;
+            document.getElementById('alerts').textContent = critical;
+            
+            const tbody = document.getElementById('eventStream');
+            tbody.innerHTML = data.map(log => `
+                <tr>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td><span class="log-severity-${log.severity}">${log.severity}</span></td>
+                    <td><span class="badge bg-secondary">${log.event_type || 'N/A'}</span></td>
+                    <td>${log.source_host || log.source_ip || 'N/A'}</td>
+                    <td>${log.message}</td>
+                </tr>
+            `).join('');
+        });
+}
+</script>
+{% endblock %}

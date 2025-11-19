@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-welcome">
+    <h1><i class="fas fa-user-shield"></i> Welcome, {{ username }}!</h1>
+    <p class="mb-0">Role: Administrator | Full system access and control</p>
+    <div class="quick-actions">
+        <a href="{{ url_for('users.list_users') }}" class="btn zain-btn-secondary">
+            <i class="fas fa-users"></i> Manage Users
+        </a>
+        <a href="{{ url_for('groups.list_groups') }}" class="btn zain-btn-secondary">
+            <i class="fas fa-user-shield"></i> Manage Groups
+        </a>
+        <a href="{{ url_for('siem.siem_dashboard') }}" class="btn zain-btn-secondary">
+            <i class="fas fa-shield-alt"></i> SIEM Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-purple">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-value" id="totalUsers">--</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-yellow">
+            <div class="stat-icon"><i class="fas fa-user-shield"></i></div>
+            <div class="stat-value" id="totalGroups">--</div>
+            <div class="stat-label">Total Groups</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-black">
+            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-value" id="criticalLogs">--</div>
+            <div class="stat-label">Critical Events</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
+            <div class="stat-value" id="totalLogs">--</div>
+            <div class="stat-label">Total Events</div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="chart-container">
+            <canvas id="logsChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="chart-container">
+            <canvas id="severityChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list"></i> Recent System Events
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Severity</th>
+                                <th>Event Type</th>
+                                <th>Source</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentLogs">
+                            <tr>
+                                <td colspan="5" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    setInterval(loadDashboardData, 30000);
+});
+
+function loadDashboardData() {
+    fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('totalUsers').textContent = data.length;
+        });
+    
+    fetch('/api/groups')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('totalGroups').textContent = data.length;
+        });
+    
+    fetch('/api/logs?limit=100')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('totalLogs').textContent = data.length;
+            
+            const critical = data.filter(log => log.severity === 'CRITICAL').length;
+            document.getElementById('criticalLogs').textContent = critical;
+            
+            updateRecentLogs(data.slice(0, 10));
+            updateCharts(data);
+        });
+}
+
+function updateRecentLogs(logs) {
+    const tbody = document.getElementById('recentLogs');
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">No events found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = logs.map(log => `
+        <tr>
+            <td>${new Date(log.timestamp).toLocaleString()}</td>
+            <td><span class="log-severity-${log.severity}">${log.severity}</span></td>
+            <td>${log.event_type || 'N/A'}</td>
+            <td>${log.source_host || log.source_ip || 'N/A'}</td>
+            <td>${log.message}</td>
+        </tr>
+    `).join('');
+}
+
+function updateCharts(logs) {
+    const severityCounts = {
+        'INFO': 0,
+        'WARNING': 0,
+        'ERROR': 0,
+        'CRITICAL': 0
+    };
+    
+    logs.forEach(log => {
+        if (severityCounts.hasOwnProperty(log.severity)) {
+            severityCounts[log.severity]++;
+        }
+    });
+    
+    const ctx1 = document.getElementById('logsChart');
+    if (window.logsChartInstance) {
+        window.logsChartInstance.destroy();
+    }
+    window.logsChartInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: ['INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+            datasets: [{
+                label: 'Event Count by Severity',
+                data: [severityCounts.INFO, severityCounts.WARNING, severityCounts.ERROR, severityCounts.CRITICAL],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(255, 193, 7, 0.8)',
+                    'rgba(220, 53, 69, 0.8)',
+                    'rgba(139, 0, 0, 0.8)'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    
+    const ctx2 = document.getElementById('severityChart');
+    if (window.severityChartInstance) {
+        window.severityChartInstance.destroy();
+    }
+    window.severityChartInstance = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+            datasets: [{
+                data: [severityCounts.INFO, severityCounts.WARNING, severityCounts.ERROR, severityCounts.CRITICAL],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(255, 193, 7, 0.8)',
+                    'rgba(220, 53, 69, 0.8)',
+                    'rgba(139, 0, 0, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+</script>
+{% endblock %}

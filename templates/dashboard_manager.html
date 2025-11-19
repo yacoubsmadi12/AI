@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Manager Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-welcome">
+    <h1><i class="fas fa-user-tie"></i> Welcome, {{ username }}!</h1>
+    <p class="mb-0">Role: Manager | Team oversight and monitoring capabilities</p>
+    <div class="quick-actions">
+        <a href="{{ url_for('users.list_users') }}" class="btn zain-btn-secondary">
+            <i class="fas fa-users"></i> View Users
+        </a>
+        <a href="{{ url_for('siem.siem_dashboard') }}" class="btn zain-btn-secondary">
+            <i class="fas fa-shield-alt"></i> SIEM Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="stat-card stat-card-yellow">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-value" id="teamUsers">--</div>
+            <div class="stat-label">Team Members</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="stat-card stat-card-black">
+            <div class="stat-icon"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="stat-value" id="criticalEvents">--</div>
+            <div class="stat-label">Critical Events</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="stat-value" id="totalEvents">--</div>
+            <div class="stat-label">Total Events</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-clipboard-list"></i> Recent Activity
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Severity</th>
+                                <th>Type</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityTable">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadManagerData();
+    setInterval(loadManagerData, 30000);
+});
+
+function loadManagerData() {
+    fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('teamUsers').textContent = data.length;
+        });
+    
+    fetch('/api/logs/latest?limit=20')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('totalEvents').textContent = data.length;
+            const critical = data.filter(log => log.severity === 'CRITICAL').length;
+            document.getElementById('criticalEvents').textContent = critical;
+            
+            const tbody = document.getElementById('activityTable');
+            tbody.innerHTML = data.map(log => `
+                <tr>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td><span class="log-severity-${log.severity}">${log.severity}</span></td>
+                    <td>${log.event_type || 'N/A'}</td>
+                    <td>${log.message}</td>
+                </tr>
+            `).join('');
+        });
+}
+</script>
+{% endblock %}

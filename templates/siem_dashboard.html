@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-shield-alt"></i> SIEM Event Dashboard</span>
+                <div>
+                    <form method="POST" action="{{ url_for('siem.simulate_log') }}" class="d-inline">
+                        <button type="submit" class="btn btn-sm zain-btn-secondary">
+                            <i class="fas fa-plus"></i> Simulate Log
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('siem.generate_sample_logs') }}" class="d-inline">
+                        <button type="submit" class="btn btn-sm zain-btn-secondary">
+                            <i class="fas fa-database"></i> Generate 50 Logs
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="color: #28a745;"><i class="fas fa-info-circle"></i></div>
+            <div class="stat-value" id="infoCount">0</div>
+            <div class="stat-label">INFO</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="color: #ffc107;"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="stat-value" id="warningCount">0</div>
+            <div class="stat-label">WARNING</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="color: #dc3545;"><i class="fas fa-times-circle"></i></div>
+            <div class="stat-value" id="errorCount">0</div>
+            <div class="stat-label">ERROR</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-black">
+            <div class="stat-icon"><i class="fas fa-skull-crossbones"></i></div>
+            <div class="stat-value" id="criticalCount">0</div>
+            <div class="stat-label">CRITICAL</div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8 mb-3">
+        <div class="chart-container">
+            <canvas id="eventTimelineChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="chart-container">
+            <canvas id="eventTypeChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list"></i> Latest Events (Last 50)
+                <button class="btn btn-sm btn-light float-end" onclick="refreshLogs()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Timestamp</th>
+                                <th>Severity</th>
+                                <th>Event Type</th>
+                                <th>Source IP</th>
+                                <th>Source Host</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTable">
+                            {% for log in logs %}
+                            <tr>
+                                <td>{{ log.id }}</td>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'N/A' }}</td>
+                                <td><span class="log-severity-{{ log.severity }}">{{ log.severity }}</span></td>
+                                <td><span class="badge bg-secondary">{{ log.event_type or 'N/A' }}</span></td>
+                                <td>{{ log.source_ip or 'N/A' }}</td>
+                                <td>{{ log.source_host or 'N/A' }}</td>
+                                <td>{{ log.message }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center">No events found. Click "Generate 50 Logs" to create sample data.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let chartInstances = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSIEMData();
+    setInterval(loadSIEMData, 15000);
+});
+
+function refreshLogs() {
+    loadSIEMData();
+}
+
+function loadSIEMData() {
+    fetch('/api/logs?limit=50')
+        .then(res => res.json())
+        .then(data => {
+            updateSeverityCounts(data);
+            updateLogsTable(data);
+            updateCharts(data);
+        });
+}
+
+function updateSeverityCounts(logs) {
+    const counts = {
+        'INFO': 0,
+        'WARNING': 0,
+        'ERROR': 0,
+        'CRITICAL': 0
+    };
+    
+    logs.forEach(log => {
+        if (counts.hasOwnProperty(log.severity)) {
+            counts[log.severity]++;
+        }
+    });
+    
+    document.getElementById('infoCount').textContent = counts.INFO;
+    document.getElementById('warningCount').textContent = counts.WARNING;
+    document.getElementById('errorCount').textContent = counts.ERROR;
+    document.getElementById('criticalCount').textContent = counts.CRITICAL;
+}
+
+function updateLogsTable(logs) {
+    const tbody = document.getElementById('logsTable');
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No events found. Click "Generate 50 Logs" to create sample data.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = logs.map(log => `
+        <tr>
+            <td>${log.id}</td>
+            <td>${new Date(log.timestamp).toLocaleString()}</td>
+            <td><span class="log-severity-${log.severity}">${log.severity}</span></td>
+            <td><span class="badge bg-secondary">${log.event_type || 'N/A'}</span></td>
+            <td>${log.source_ip || 'N/A'}</td>
+            <td>${log.source_host || 'N/A'}</td>
+            <td>${log.message}</td>
+        </tr>
+    `).join('');
+}
+
+function updateCharts(logs) {
+    const eventTypes = {};
+    logs.forEach(log => {
+        const type = log.event_type || 'UNKNOWN';
+        eventTypes[type] = (eventTypes[type] || 0) + 1;
+    });
+    
+    const ctx1 = document.getElementById('eventTimelineChart');
+    if (chartInstances.timeline) {
+        chartInstances.timeline.destroy();
+    }
+    chartInstances.timeline = new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: logs.slice(0, 20).map((_, i) => i + 1),
+            datasets: [{
+                label: 'Event Timeline',
+                data: logs.slice(0, 20).map((log, i) => i + 1),
+                borderColor: 'rgba(106, 27, 154, 1)',
+                backgroundColor: 'rgba(106, 27, 154, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    
+    const ctx2 = document.getElementById('eventTypeChart');
+    if (chartInstances.eventType) {
+        chartInstances.eventType.destroy();
+    }
+    chartInstances.eventType = new Chart(ctx2, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(eventTypes),
+            datasets: [{
+                data: Object.values(eventTypes),
+                backgroundColor: [
+                    'rgba(106, 27, 154, 0.8)',
+                    'rgba(255, 215, 0, 0.8)',
+                    'rgba(26, 26, 26, 0.8)',
+                    'rgba(33, 150, 243, 0.8)',
+                    'rgba(255, 87, 34, 0.8)',
+                    'rgba(76, 175, 80, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+</script>
+{% endblock %}
