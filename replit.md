@@ -7,6 +7,20 @@ A complete, production-ready Security Information & Event Management (SIEM) dash
 
 ## Recent Changes (November 19, 2025)
 
+### Log Ingestion System (Latest Update)
+- Added comprehensive log ingestion system with three methods:
+  - **CSV File Upload**: Upload and import logs from CSV files with log source assignment
+  - **Syslog API Endpoint** (`/api/syslog`): Receive raw syslog data from external systems
+  - **JSON API Endpoint** (`/api/ingest`): Ingest structured JSON log batches
+- Created `log_sources` database table to track log origins
+- Added foreign key relationship between `syslog_events` and `log_sources`
+- Built UI components for log source management (`upload_logs.html`, `log_sources.html`)
+- Implemented robust transaction management with proper error handling and rollback
+- Added API key-based authentication for external log ingestion
+- Integrated log source statistics tracking (total logs received, last received timestamp)
+- Fixed Psycopg2 transaction state issues with separate connections per bulk insert
+- Added comprehensive error logging for ingestion failures
+
 ### Initial Project Build
 - Created complete SIEM dashboard application from scratch
 - Implemented user authentication and role-based access control (Admin, Manager, Analyst, User)
@@ -37,7 +51,8 @@ A complete, production-ready Security Information & Event Management (SIEM) dash
 - **users** - User accounts with bcrypt password hashing
 - **groups** - User group organization
 - **permissions** - Granular group-based permissions (CRUD)
-- **syslog_events** - Security event logs with severity tracking
+- **log_sources** - External log sources with API keys and statistics (NEW)
+- **syslog_events** - Security event logs with severity tracking and log source linkage
 - **activity_reports** - Automated daily activity summaries
 
 ## User Preferences
@@ -95,6 +110,16 @@ A complete, production-ready Security Information & Event Management (SIEM) dash
    - `/api/users` - User management
    - `/api/groups` - Group operations
    - `/api/daily-report` - Automated activity reports
+   - `/api/ingest` - Ingest JSON log batches (requires API key)
+   - `/api/syslog` - Receive raw syslog data (requires API key)
+
+6. **Log Ingestion System**
+   - CSV file upload with source assignment
+   - Real-time syslog reception from external systems
+   - API-based log forwarding with authentication
+   - Log source management and statistics tracking
+   - Automatic error handling and transaction rollback
+   - Support for Arabic and English log formats
 
 ## Running on Replit
 - Click "Run" button to start Flask server
@@ -112,13 +137,14 @@ See README.md for detailed Linux server deployment instructions including:
 - Security hardening recommendations
 
 ## Future Enhancements
-- Real syslog protocol integration (prepared function exists)
 - Automated email notifications for daily reports
 - Advanced anomaly detection algorithms
-- WebSocket live updates
+- WebSocket live updates for real-time log streaming
 - PDF/CSV report exports
 - Two-factor authentication
 - Audit trail enhancements
+- Custom parsing rules for different log formats
+- Integration with popular SIEM tools (Splunk, ELK)
 
 ## Technical Notes
 
