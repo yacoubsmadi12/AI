@@ -1,10 +1,13 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from datetime import datetime
 import database
+from routes.auth import login_required, role_required
 
 bp = Blueprint('reports_api', __name__, url_prefix='/api')
 
 @bp.route('/daily-report', methods=['GET'])
+@login_required
+@role_required(['Admin', 'Manager'])
 def get_daily_report_api():
     group_id = request.args.get('group')
     date_str = request.args.get('date')

@@ -1,5 +1,6 @@
 from flask import Flask, session, redirect, url_for
 from flask_session import Session
+from flask_wtf.csrf import CSRFProtect
 from config import Config
 import database
 import os
@@ -8,6 +9,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 Session(app)
+csrf = CSRFProtect(app)
 
 database.init_database()
 

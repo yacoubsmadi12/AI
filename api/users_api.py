@@ -1,9 +1,12 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 import database
+from routes.auth import login_required, role_required
 
 bp = Blueprint('users_api', __name__, url_prefix='/api')
 
 @bp.route('/users', methods=['GET'])
+@login_required
+@role_required(['Admin', 'Manager'])
 def get_users():
     users = database.get_all_users()
     
@@ -23,6 +26,8 @@ def get_users():
     return jsonify(users_list)
 
 @bp.route('/users/add', methods=['POST'])
+@login_required
+@role_required(['Admin'])
 def add_user_api():
     data = request.get_json()
     

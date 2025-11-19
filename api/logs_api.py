@@ -1,9 +1,12 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 import database
+from routes.auth import login_required, role_required
 
 bp = Blueprint('logs_api', __name__, url_prefix='/api')
 
 @bp.route('/logs', methods=['GET'])
+@login_required
+@role_required(['Admin', 'Manager', 'Analyst'])
 def get_logs():
     limit = request.args.get('limit', 100, type=int)
     severity = request.args.get('severity')
@@ -28,6 +31,8 @@ def get_logs():
     return jsonify(logs_list)
 
 @bp.route('/logs/latest', methods=['GET'])
+@login_required
+@role_required(['Admin', 'Manager', 'Analyst'])
 def get_latest_logs():
     limit = request.args.get('limit', 20, type=int)
     logs = database.get_latest_logs(limit)

@@ -10,11 +10,13 @@
                 <span><i class="fas fa-shield-alt"></i> SIEM Event Dashboard</span>
                 <div>
                     <form method="POST" action="{{ url_for('siem.simulate_log') }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm zain-btn-secondary">
                             <i class="fas fa-plus"></i> Simulate Log
                         </button>
                     </form>
                     <form method="POST" action="{{ url_for('siem.generate_sample_logs') }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm zain-btn-secondary">
                             <i class="fas fa-database"></i> Generate 50 Logs
                         </button>
